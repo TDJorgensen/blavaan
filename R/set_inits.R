@@ -1,4 +1,4 @@
-set_inits <- function(partable, ov.cp, lv.cp, n.chains, inits){
+set_inits <- function(partable, ov.cp, lv.cp, n.chains, inits, target){
   ## Generate initial values for each chain
   ## TODO write start values to new columns of coefvec, so can include in partable
   initvals <- vector("list", n.chains)
@@ -35,11 +35,14 @@ set_inits <- function(partable, ov.cp, lv.cp, n.chains, inits){
     if((i %in% wps) | partable$free[i] == 0 | partable$prior[i] == "") next
     ## next unless it is a simple equality constraint:
     if(length(eqcons) > 0 & !grepl('^\\.p', partable$rhs[eqcons[1]])) next
-    
+
     tmppri <- partable$prior[i]
-      
-    pricom <- unlist(strsplit(tmppri, "[, ()]+"))
-    
+    if(target == "jags"){
+      pricom <- unlist(strsplit(tmppri, "[, ()]+"))
+    } else {
+      pricom <- unlist(dist2r(tmppri, target="stan"))
+    }
+
     if(inits == "prior"){
       ## Try to set sensible starting values, using some of the
       ## prior information
@@ -67,7 +70,8 @@ set_inits <- function(partable, ov.cp, lv.cp, n.chains, inits){
                                      as.numeric(pricom[3]))), silent = TRUE)
       if(inherits(ivs, "try-error")) ivs <- rep(NA, n.chains)
     } else {
-      ivs <- rep(partable$start[i], n.chains)
+      tmpstart <- partable$start[i] + .5*(pricom[1] == "dbeta")
+      ivs <- rep(tmpstart, n.chains)
     }
 
     ## now (try to) ensure the jittered values won't crash on us
@@ -79,7 +83,7 @@ set_inits <- function(partable, ov.cp, lv.cp, n.chains, inits){
       ivs[ivs <= 0] <- -ivs[ivs <= 0]
     }
     if(grepl("dbeta", partable$prior[i])){
-      ivs <- rep(.5, n.chains)
+      ivs <- rep(.501, n.chains)
     }
 
     ## extract matrix, dimensions

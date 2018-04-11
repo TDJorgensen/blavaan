@@ -42,7 +42,7 @@ lav2mcmc <- function(model, lavdata = NULL, cp = "srs", lv.x.wish = FALSE, dp = 
   ## set up mvs with fixed 0 variances (single indicators of lvs)
   partable <- set_mv0(partable, orig.ov.names, ngroups)
   ## add necessary phantom lvs/mvs to model:
-  partable <- set_phantoms(partable, orig.ov.names, orig.lv.names, orig.ov.names.x, orig.lv.names.x, cp, cp, lv.x.wish, ngroups)
+  partable <- set_phantoms(partable, orig.ov.names, orig.lv.names, orig.ov.names.x, orig.lv.names.x, cp, cp, lv.x.wish, ngroups, target)
   facovs <- partable$facovs
   partable <- partable$partable
   ## set equality constraints for phantom variances
@@ -495,14 +495,10 @@ lav2mcmc <- function(model, lavdata = NULL, cp = "srs", lv.x.wish = FALSE, dp = 
   if(target == "stan") out <- paste0(out, TXT3, "\n}")
   class(out) <- c("lavaan.character", "character")
   out <- list(model = out, inits = NA)
-    
+
   ## Initial values
-  if(inits != "jags"){
-      if(target == "stan") stop("blavaan ERROR: random inits not yet available for stan")
-      inits <- set_inits(partable, cp, cp, n.chains, inits)
-      out$inits <- inits
-  }
-        
+  inits <- set_inits(partable, cp, cp, n.chains, inits, target)
+  
   ## Now add data for jags if we have it
   datablk <- paste0("data{\n", t1, "int N;\n", t1, "int g[N];\n")
   if(!is.null(lavdata) | class(model)[1]=="lavaan"){
@@ -583,7 +579,11 @@ lav2mcmc <- function(model, lavdata = NULL, cp = "srs", lv.x.wish = FALSE, dp = 
 
     pmats <- vector("list", length(matrows))
     for(i in 1:length(pmats)){
+      if(names(matrows)[1] %in% c("theta", "psi", "rho")){
+        pmats[[i]] <- array(diag(matrows[i]), c(matrows[i], matcols[i], grp))
+      } else {
         pmats[[i]] <- array(0, c(matrows[i], matcols[i], ngrp))
+      }
     }
     names(pmats) <- names(matrows)
 
@@ -596,11 +596,15 @@ lav2mcmc <- function(model, lavdata = NULL, cp = "srs", lv.x.wish = FALSE, dp = 
         pmats[[wmat]][partable$row[i], partable$col[i], partable$group[i]] <- NA
       }
     }
-
+    
     ## monitored parameters
-    monitors <- with(partable[partable$mat != "",],
-                     paste(mat, "[", row, ",", col, ",", group, "]",
-                           sep=""))
+    if(target == "jags"){
+      monitors <- with(partable[partable$mat != "",],
+                       paste(mat, "[", row, ",", col, ",", group, "]",
+                             sep=""))
+    } else {
+      monitors <- with(partable, unique(mat[mat != ""]))
+    }
     
     ## inferential covariances under fa priors
     if(cp == "fa" & length(facovs) > 0){
@@ -650,7 +654,7 @@ lav2mcmc <- function(model, lavdata = NULL, cp = "srs", lv.x.wish = FALSE, dp = 
       if(any(grepl("thetastar", tpnames))){
         thetloc <- which(names(pmats) == "thetastarframe")
         thetdim <- dim(pmats[[thetloc]])
-        rhoframe <- array(0, thetdim)
+        rhoframe <- array(diag(thetdim[1]), thetdim)
         pmats <- c(pmats, list(rhoframe = rhoframe))
         datdecs <- paste0(datdecs, t1, "real ",
                           "rhoframe[", thetdim[1], ",",
@@ -664,7 +668,7 @@ lav2mcmc <- function(model, lavdata = NULL, cp = "srs", lv.x.wish = FALSE, dp = 
       if(any(grepl("psistar", tpnames))){
         psiloc <- which(names(pmats) == "psistarframe")
         psidim <- dim(pmats[[psiloc]])
-        lvrhoframe <- array(0, psidim)
+        lvrhoframe <- array(diag(psidim[1]), psidim)
         pmats <- c(pmats, list(lvrhoframe = lvrhoframe))
         datdecs <- paste0(datdecs, t1, "real ",
                           "lvrhoframe[", psidim[1], ",",
@@ -695,6 +699,9 @@ lav2mcmc <- function(model, lavdata = NULL, cp = "srs", lv.x.wish = FALSE, dp = 
   }
 
   if(target == "stan"){
+    inits <- lapply(inits, function(x) c(x, list(eta = matrix(0, ntot,
+                                                              length(lv.names)))))
+
     nparms <- max(partable$freeparnums, na.rm = TRUE)
     parmblk <- paste0("parameters{\n", t1, "vector[",
                       nparms, "] parvec;\n")
@@ -706,6 +713,8 @@ lav2mcmc <- function(model, lavdata = NULL, cp = "srs", lv.x.wish = FALSE, dp = 
     parmblk <- paste0(parmblk, "}\n\n")    
     out$model <- paste0(datablk, parmblk, TPS, out$model)
   }
+
+  out$inits <- inits
   
   out <- c(out, list(monitors = monitors, pxpartable = partable))
     

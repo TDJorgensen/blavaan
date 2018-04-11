@@ -227,6 +227,7 @@ blavaan <- function(...,  # default lavaan arguments
       mcdebug <- dotdotdot$debug
       dotdotdot <- dotdotdot[-which(dotNames == "debug")]
     }
+    #if(inits == "simple") dotdotdot$start <- "simple"
     LAV <- suppressWarnings(do.call("lavaan", dotdotdot))
 
     if(LAV@Data@data.type == "moment") {
@@ -374,12 +375,12 @@ blavaan <- function(...,  # default lavaan arguments
     if(lavmodel@nx.free > 0L) {
         if(!trans.exists){
             ## convert partable to mcmc syntax, then run
-            if(target == "jags"){
+            if(target %in% c("jags","stan")){
                 jagtrans <- try(lav2mcmc(model = lavpartable, lavdata = lavdata,
                                          cp = cp, lv.x.wish = lavoptions$auto.cov.lv.x,
                                          dp = dp, n.chains = n.chains,
                                          mcmcextra = mcmcextra, inits = initsin,
-                                         blavmis = blavmis, target="jags"),
+                                         blavmis = blavmis, target = target),
                                 silent = TRUE)
             } else {
                 jagtrans <- try(lav2stan(model = LAV,
@@ -428,7 +429,7 @@ blavaan <- function(...,  # default lavaan arguments
                 for(i in 1:n.chains){
                     jagtrans$inits[[i]] <- c(jagtrans$inits[[i]], sdinit[[i]])
                 }
-            } else if(seedlen > 0 & target == "stan"){
+            } else if(seedlen > 0 & target != "jags"){
                 if(!("seed" %in% names(bcontrol))){
                     bcontrol <- c(bcontrol, list(seed = seed))
                 }
