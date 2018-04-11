@@ -40,6 +40,9 @@ set_parvec <- function(TXT2, partable, dp, cp, lv.x.wish, lv.names.x, target="ja
         }
     }
 
+    ## TXT4 holds thetastars with equality constraints
+    TXT4 <- NULL
+  
     for(i in 1:nrow(partable)){
         if((partable$mat[i] != "" & !(i %in% wishpars)) | partable$op[i] == ":="){            
             ## to find equality constraints
@@ -64,21 +67,26 @@ set_parvec <- function(TXT2, partable, dp, cp, lv.x.wish, lv.names.x, target="ja
             }
           
             ## start parameter assignment
-            TXT2 <- paste(TXT2, "\n", t1, partable$mat[i], "[",
-                          partable$row[i], ",", partable$col[i],
-                          ",", partable$group[i], "] ", eqop,
-                          " ", sep="")
+            tmptxt <- paste("\n", t1, partable$mat[i], "[",
+                            partable$row[i], ",", partable$col[i],
+                            ",", partable$group[i], "] ", eqop,
+                            " ", sep="")
             if(grepl("rho", partable$id[i]) & partable$free[i] > 0){
-              TXT2 <- paste(TXT2, "-1 + 2*", sep="")
+              tmptxt <- paste0(tmptxt, "-1 + 2*")
+            }
+            if(partable$free[i] == 0 & partable$op[i] != ":="){
+              TXT4 <- paste0(TXT4, tmptxt)
+            } else {
+              TXT2 <- paste0(TXT2, tmptxt)
             }
           
             if(partable$free[i] == 0 & partable$op[i] != ":="){
                 if(is.na(partable$ustart[i])){
                     ## exo
-                    TXT2 <- paste(TXT2, partable$start[i], eolop,
+                    TXT4 <- paste(TXT4, partable$start[i], eolop,
                                   sep="")
                 } else {
-                    TXT2 <- paste(TXT2, partable$ustart[i], eolop,
+                    TXT4 <- paste(TXT4, partable$ustart[i], eolop,
                                   sep="")
                 }
             } else if(length(eqpar) > 0){
@@ -194,6 +202,9 @@ set_parvec <- function(TXT2, partable, dp, cp, lv.x.wish, lv.names.x, target="ja
                       partable$group[tmppar], "]", eolop, sep="")
       }
     }
+
+    ## add back in expanded variance equality constraints
+    TXT2 <- paste0(TXT2, TXT4)
       
     ## now define inferential covariances and priors for inferential
     ## variances, if needed
