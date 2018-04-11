@@ -1,4 +1,4 @@
-set_phantoms <- function(partable, ov.names, lv.names, ov.names.x, lv.names.x, ov.cp, lv.cp, lv.x.wish, ngroups) {
+set_phantoms <- function(partable, ov.names, lv.names, ov.names.x, lv.names.x, ov.cp, lv.cp, lv.x.wish, ngroups, target) {
   ## Add phantom lvs for covariance parameters
 
   ## first: parameter matrices + indexing
@@ -12,6 +12,10 @@ set_phantoms <- function(partable, ov.names, lv.names, ov.names.x, lv.names.x, o
     partable$group[defpar] <- 1
   }
 
+  ## abs() vs fabs()
+  absop <- "fabs"
+  if(target == "jags") absop <- "abs"
+  
   ## add prior column if it doesn't exist
   if(is.na(match("prior", names(partable)))) partable$prior <- rep("", length(partable$id))
     
@@ -218,9 +222,16 @@ nlvcovs)
           ## srs priors
           partable$free[tmprows[1:3]] <- 0L
           partable$exo[tmprows[1:3]] <- 0L
-          partable$ustart[tmprows[1]] <- paste("sqrt(abs(", rhomat, "[", rhoind, ",", k, "])*", tmpv1, ")", sep="")
-          partable$ustart[tmprows[2]] <- paste("(-1 + 2*step(", rhomat, "[", rhoind, ",", k,
-                                             "]))*sqrt(abs(", rhomat, "[", rhoind, ",", k, "])*", tmpv2, ")", sep="")
+          partable$ustart[tmprows[1]] <- paste("sqrt(", absop, "(",
+                                               rhomat, "[", rhoind,
+                                               ",", k, "])*", tmpv1,
+                                               ")", sep="")
+          partable$ustart[tmprows[2]] <- paste("(-1 + 2*step(",
+                                               rhomat, "[", rhoind,
+                                               ",", k, "]))*sqrt(",
+                                               absop, "(", rhomat,
+                                               "[", rhoind, ",", k,
+                                               "])*", tmpv2, ")", sep="")
           partable$ustart[tmprows[3]] <- 1
           partable$mat[tmprows[3]] <- "psi"
           partable$row[tmprows[3]] <- partable$col[tmprows[3]] <- tpcs
