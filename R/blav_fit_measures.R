@@ -1,19 +1,21 @@
 setMethod("fitMeasures", signature(object = "blavaan"),
-function(object, fit.measures = "all", baseline.model = NULL) {
+function(object, fit.measures = "all", baseline.model = NULL, h1.model = NULL) {
     blav_fit_measures(object = object, fit.measures = fit.measures,
-                     baseline.model = baseline.model)
+                     baseline.model = baseline.model, h1.model = h1.model)
 })
 
 # lowercase 'm'
 setMethod("fitmeasures", signature(object = "blavaan"),
-function(object, fit.measures = "all", baseline.model = NULL) {
+function(object, fit.measures = "all", baseline.model = NULL, h1.model = NULL) {
     blav_fit_measures(object = object, fit.measures = fit.measures,
-                     baseline.model = baseline.model)
+                     baseline.model = baseline.model, h1.model = h1.model)
 })
 
 
 blav_fit_measures <- function(object, fit.measures = "all", 
-                              baseline.model = NULL) {
+                              baseline.model = NULL,
+                              ## ignored, but required by lavaan's generic
+                              h1.model = NULL) {
 
     # has the model converged?
     if(object@Fit@npar > 0L && !object@optim$converged &&
